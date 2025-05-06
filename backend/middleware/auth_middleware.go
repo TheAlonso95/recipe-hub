@@ -27,7 +27,25 @@ import (
 const KeyUserID = "user_id"
 
 // AuthMiddleware checks if the request has a valid JWT token
+// KeyUserID is the key used to store the user ID in the request context
+const KeyUserID = "user_id"
+
+// AuthMiddleware checks if the request has a valid JWT token
 func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in AuthMiddleware: %v", r)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}()
+
+		// Get token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authorization header required", http.StatusUnauthorized)
+			return
+		}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
