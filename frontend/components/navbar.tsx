@@ -17,7 +17,20 @@ export default function Navbar() {
     setIsLoading(false);
   }, []);
 
+}, []);
+
   const handleLogout = async () => {
+    try {
+      await auth.logout();
+      setIsAuthenticated(false);
+      router.refresh();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // TODO: Implement error handling for failed logout
+    }
+  };
+
+  return (
     await auth.logout();
     setIsAuthenticated(false);
     router.refresh();
