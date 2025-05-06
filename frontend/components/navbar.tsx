@@ -30,7 +30,27 @@ export default function Navbar() {
     }
   };
 
+useEffect(() => {
+    // Check authentication status on component mount
+    setIsAuthenticated(auth.isAuthenticated());
+    setIsLoading(false);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await auth.logout();
+      setIsAuthenticated(false);
+      router.refresh();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // TODO: Implement error handling for failed logout
+    }
+  };
+
   return (
+    <nav className="bg-white shadow-sm border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
     await auth.logout();
     setIsAuthenticated(false);
     router.refresh();
