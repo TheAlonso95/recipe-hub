@@ -20,6 +20,16 @@ require (
 )
 
 require (
+module github.com/yourorg/recipe-app
+
+go 1.21
+
+require (
+	github.com/jackc/pgx/v4 v4.18.2
+	github.com/joho/godotenv v1.5.1
+)
+
+require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
