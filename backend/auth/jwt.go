@@ -19,7 +19,17 @@ type CustomClaims struct {
 // GenerateToken creates a new JWT token for a user
 func GenerateToken(user *models.User) (string, error) {
 	// Get JWT secret from environment
-	jwtSecret := config.GetEnv("JWT_SECRET", "default_secret_change_this_in_production")
+// GenerateToken creates a new JWT token for a user
+func GenerateToken(user *models.User) (string, error) {
+	// Get JWT secret from environment
+	jwtSecret := config.GetEnv("JWT_SECRET", "")
+
+	if jwtSecret == "" {
+		return "", fmt.Errorf("JWT_SECRET is not set")
+	}
+
+	// Create the claims
+	claims := CustomClaims{
 
 	// Create the claims
 	claims := CustomClaims{
