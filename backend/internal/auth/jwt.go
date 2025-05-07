@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/yourorg/recipe-app/config"
-	"github.com/yourorg/recipe-app/models"
+	"github.com/TheAlonso95/recipe-app/internal/config"
+	"github.com/TheAlonso95/recipe-app/internal/models"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // CustomClaims represents the claims in the JWT token
@@ -16,9 +16,7 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateToken creates a new JWT token for a user
-func GenerateToken(user *models.User) (string, error) {
-	// Get JWT secret from environment
+// Get JWT secret from environment
 // GenerateToken creates a new JWT token for a user
 func GenerateToken(user *models.User) (string, error) {
 	// Get JWT secret from environment
@@ -27,9 +25,6 @@ func GenerateToken(user *models.User) (string, error) {
 	if jwtSecret == "" {
 		return "", fmt.Errorf("JWT_SECRET is not set")
 	}
-
-	// Create the claims
-	claims := CustomClaims{
 
 	// Create the claims
 	claims := CustomClaims{
@@ -56,9 +51,7 @@ func GenerateToken(user *models.User) (string, error) {
 	return tokenString, nil
 }
 
-// ValidateToken validates a JWT token and returns the claims
-func ValidateToken(tokenString string) (*CustomClaims, error) {
-	// Get JWT secret from environment
+// Get JWT secret from environment
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*CustomClaims, error) {
 	// Get JWT secret from environment
@@ -67,9 +60,6 @@ func ValidateToken(tokenString string) (*CustomClaims, error) {
 	if jwtSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is not set")
 	}
-
-	// Parse the token
-	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {

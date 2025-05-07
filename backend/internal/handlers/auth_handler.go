@@ -6,9 +6,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/yourorg/recipe-app/auth"
-	"github.com/yourorg/recipe-app/models"
-	"github.com/yourorg/recipe-app/repository"
+	"github.com/TheAlonso95/recipe-app/internal/auth"
+	"github.com/TheAlonso95/recipe-app/internal/models"
+	"github.com/TheAlonso95/recipe-app/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -38,7 +38,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Email and password are required", http.StatusBadRequest)
 		return
 	}
-	
+
 	if len(req.Password) < 6 {
 		http.Error(w, "Password must be at least 6 characters", http.StatusBadRequest)
 		return

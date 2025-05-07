@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourorg/recipe-app/models"
+	"github.com/TheAlonso95/recipe-app/internal/models"
 )
 
 func TestGenerateAndValidateToken(t *testing.T) {

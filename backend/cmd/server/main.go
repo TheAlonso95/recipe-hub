@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourorg/recipe-app/config"
-	"github.com/yourorg/recipe-app/db"
-	"github.com/yourorg/recipe-app/routes"
+	"github.com/TheAlonso95/recipe-app/internal/config"
+	"github.com/TheAlonso95/recipe-app/internal/db"
+	"github.com/TheAlonso95/recipe-app/internal/routes"
 )
 
 func main() {
@@ -29,7 +28,11 @@ func main() {
 	log.Println("Connected to PostgreSQL database successfully!")
 
 	// Set up the router
-	router := routes.SetupRoutes(database)
+	router, err := routes.SetupRoutes(database)
+
+	if err != nil {
+		log.Fatalf("Failed to set up routes: %v", err)
+	}
 
 	// Get port from environment, default to 8080
 	port := config.GetEnv("PORT", "8080")

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yourorg/recipe-app/models"
-	"github.com/yourorg/recipe-app/repository"
+	"github.com/TheAlonso95/recipe-app/internal/models"
+	"github.com/TheAlonso95/recipe-app/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -27,7 +27,7 @@ func (m *MockUserRepository) CreateUser(user *models.User) error {
 	if _, exists := m.users[user.Email]; exists {
 		return repository.ErrDuplicateEmail
 	}
-	
+
 	// Auto-increment ID (simple simulation)
 	user.ID = len(m.users) + 1
 	m.users[user.Email] = user
@@ -68,7 +68,7 @@ func TestRegister(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	
+
 	handler.Register(w, req)
 
 	if w.Code != http.StatusCreated {
@@ -81,7 +81,7 @@ func TestRegister(t *testing.T) {
 	if response.Token == "" {
 		t.Error("Expected token to be returned")
 	}
-	
+
 	if response.User.Email != reqBody.Email {
 		t.Errorf("Expected email %s, got %s", reqBody.Email, response.User.Email)
 	}
@@ -89,7 +89,7 @@ func TestRegister(t *testing.T) {
 	// Test duplicate email
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	w = httptest.NewRecorder()
-	
+
 	handler.Register(w, req)
 
 	if w.Code != http.StatusConflict {
@@ -103,14 +103,14 @@ func TestLogin(t *testing.T) {
 	// First register a test user
 	email := "login-test@example.com"
 	password := "password123"
-	
+
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	user := &models.User{
 		Email:    email,
 		Password: string(hashedPassword),
 	}
-	
-	handler.AuthHandler.UserRepo.(*MockUserRepository).CreateUser(user)
+
+	handler.UserRepo.CreateUser(user)
 
 	// Test valid login
 	reqBody := models.LoginRequest{
@@ -121,7 +121,7 @@ func TestLogin(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	
+
 	handler.Login(w, req)
 
 	if w.Code != http.StatusOK {
@@ -134,14 +134,14 @@ func TestLogin(t *testing.T) {
 	if response.Token == "" {
 		t.Error("Expected token to be returned")
 	}
-	
+
 	// Test invalid password
 	reqBody.Password = "wrongpassword"
 	body, _ = json.Marshal(reqBody)
 
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	w = httptest.NewRecorder()
-	
+
 	handler.Login(w, req)
 
 	if w.Code != http.StatusUnauthorized {

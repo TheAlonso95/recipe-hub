@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourorg/recipe-app/models"
+	"github.com/TheAlonso95/recipe-app/internal/models"
 )
 
 var (
@@ -48,8 +48,8 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 
 	// Insert the new user
 	query := `
-    INSERT INTO users (email, password, created_at, updated_at) 
-    VALUES ($1, $2, $3, $4) 
+    INSERT INTO users (email, password, created_at, updated_at)
+    VALUES ($1, $2, $3, $4)
     RETURNING id`
 
 	err = r.DB.QueryRow(query, user.Email, user.Password, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
@@ -64,8 +64,8 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	user := &models.User{}
 	query := `
-    SELECT id, email, password, created_at, updated_at 
-    FROM users 
+    SELECT id, email, password, created_at, updated_at
+    FROM users
     WHERE email = $1`
 
 	err := r.DB.QueryRow(query, email).Scan(
