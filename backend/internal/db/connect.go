@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	// Import pgx driver
+	"github.com/TheAlonso95/recipe-app/internal/config"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/yourorg/recipe-app/config"
 )
 
 // Connect creates a database connection using environment variables
@@ -45,6 +45,6 @@ func Connect() (*sql.DB, error) {
 	if err == nil {
 		db.SetMaxIdleConns(maxIdleConns)
 	}
-	
+
 	return db, nil
 }
