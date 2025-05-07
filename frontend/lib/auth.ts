@@ -25,7 +25,38 @@ export const api = axios.create();
 // Configure axios interceptor to add authorization headers
 api.interceptors.request.use((config) => {
   // Get token from httpOnly cookie (handled by the browser)
-  const token = Cookies.get('token');
+api.interceptors.request.use((config) => {
+  // Get token from localStorage
+  const token = localStorage.getItem('token');
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+
+// Auth helper functions
+export const auth = {
+  // Check if user is authenticated
+  isAuthenticated: () => {
+    return !!localStorage.getItem('token');
+  },
+  
+  // Login user
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    try {
+      const response = await axios.post('/api/auth/login', credentials);
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
