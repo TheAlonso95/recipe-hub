@@ -228,7 +228,45 @@ export const auth = {
   },
 
   // Login user
+// Import CryptoJS for encryption
+// CryptoJS is used to encrypt sensitive data before storing in localStorage
+import CryptoJS from 'crypto-js';
+
+// Auth helper functions
+export const auth = {
+  // Check if user is authenticated
+  isAuthenticated: () => {
+    return !!localStorage.getItem('token');
+  },
+
+  // Register user
+  register: async (userData: RegisterCredentials) => {
+    const response = await axios.post('/api/auth/register', userData);
+    return response.data;
+  },
+
+  // Login user
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    try {
+      const response = await axios.post('/api/auth/login', credentials);
+      
+      if (response.data.token) {
+        const encryptedToken = CryptoJS.AES.encrypt(response.data.token, process.env.ENCRYPTION_KEY).toString();
+        localStorage.setItem('token', encryptedToken);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
+  },
+
+  // Logout user
+  logout: async () => {
+    localStorage.removeItem('token');
+    // TODO: Implement backend logout call
+  },
     try {
       const response = await axios.post('/api/auth/login', credentials);
       
