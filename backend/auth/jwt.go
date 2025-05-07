@@ -59,7 +59,17 @@ func GenerateToken(user *models.User) (string, error) {
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*CustomClaims, error) {
 	// Get JWT secret from environment
-	jwtSecret := config.GetEnv("JWT_SECRET", "default_secret_change_this_in_production")
+// ValidateToken validates a JWT token and returns the claims
+func ValidateToken(tokenString string) (*CustomClaims, error) {
+	// Get JWT secret from environment
+	jwtSecret := config.GetEnv("JWT_SECRET", "")
+
+	if jwtSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET is not set")
+	}
+
+	// Parse the token
+	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
