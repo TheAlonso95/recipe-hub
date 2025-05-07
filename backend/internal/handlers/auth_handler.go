@@ -1,149 +1,150 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 
-	"github.com/TheAlonso95/recipe-app/internal/auth"
-	"github.com/TheAlonso95/recipe-app/internal/models"
-	"github.com/TheAlonso95/recipe-app/internal/repository"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/yourorg/recipe-app/internal/models"
+	"github.com/yourorg/recipe-app/internal/repositories"
+	"github.com/yourorg/recipe-app/internal/utils"
 )
 
-// AuthHandler handles authentication requests
+// AuthHandler handles authentication-related requests
 type AuthHandler struct {
-	UserRepo *repository.UserRepository
+	UserRepo repositories.UserRepository
 }
 
-// NewAuthHandler creates a new AuthHandler
-func NewAuthHandler(db *sql.DB) *AuthHandler {
+// NewAuthHandler creates a new auth handler
+func NewAuthHandler(userRepo repositories.UserRepository) *AuthHandler {
 	return &AuthHandler{
-		UserRepo: repository.NewUserRepository(db),
+		UserRepo: userRepo,
 	}
+}
+
+// RegisterRequest represents the request body for user registration
+type RegisterRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// LoginRequest represents the request body for user login
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// AuthResponse represents the response for authentication operations
+type AuthResponse struct {
+	Token string `json:"token"`
+}
+
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Message string `json:"message"`
 }
 
 // Register handles user registration
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var req models.RegisterRequest
+	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate request (basic validation)
+	// Validate input
 	if req.Email == "" || req.Password == "" {
-		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		sendError(w, "Email and password are required", http.StatusBadRequest)
 		return
 	}
 
-	if len(req.Password) < 6 {
-		http.Error(w, "Password must be at least 6 characters", http.StatusBadRequest)
-		return
-	}
-
-	// Hash the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// Hash password
+	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
-		http.Error(w, "Error processing request", http.StatusInternalServerError)
+		sendError(w, "Error hashing password", http.StatusInternalServerError)
 		return
 	}
 
-	// Create user model
+	// Create user
 	user := &models.User{
 		Email:    req.Email,
-		Password: string(hashedPassword),
+		Password: hashedPassword,
 	}
 
 	// Save user to database
 	err = h.UserRepo.CreateUser(user)
 	if err != nil {
-		if errors.Is(err, repository.ErrDuplicateEmail) {
-			http.Error(w, "Email already exists", http.StatusConflict)
-			return
+		if errors.Is(err, repositories.ErrEmailAlreadyTaken) {
+			sendError(w, "Email already registered", http.StatusConflict)
+		} else {
+			sendError(w, "Error creating user", http.StatusInternalServerError)
 		}
-		http.Error(w, "Error processing request", http.StatusInternalServerError)
 		return
 	}
 
 	// Generate JWT token
-	token, err := auth.GenerateToken(user)
+	token, err := utils.GenerateToken(user)
 	if err != nil {
-		http.Error(w, "Error generating token", http.StatusInternalServerError)
+		sendError(w, "Error generating token", http.StatusInternalServerError)
 		return
 	}
 
-	// Prepare response
-	response := models.AuthResponse{
-		Token: token,
-		User: models.User{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-		},
-	}
-
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	// Return token
+	sendJSON(w, AuthResponse{Token: token}, http.StatusCreated)
 }
 
 // Login handles user login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var req models.LoginRequest
+	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate request
+	// Validate input
 	if req.Email == "" || req.Password == "" {
-		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		sendError(w, "Email and password are required", http.StatusBadRequest)
 		return
 	}
 
 	// Get user from database
 	user, err := h.UserRepo.GetUserByEmail(req.Email)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-			return
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			sendError(w, "Invalid email or password", http.StatusUnauthorized)
+		} else {
+			sendError(w, "Error retrieving user", http.StatusInternalServerError)
 		}
-		http.Error(w, "Error processing request", http.StatusInternalServerError)
 		return
 	}
 
-	// Compare passwords
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
-	if err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+	// Check password
+	if !utils.CheckPasswordHash(req.Password, user.Password) {
+		sendError(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate JWT token
-	token, err := auth.GenerateToken(user)
+	token, err := utils.GenerateToken(user)
 	if err != nil {
-		http.Error(w, "Error generating token", http.StatusInternalServerError)
+		sendError(w, "Error generating token", http.StatusInternalServerError)
 		return
 	}
 
-	// Prepare response
-	response := models.AuthResponse{
-		Token: token,
-		User: models.User{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-		},
-	}
+	// Return token
+	sendJSON(w, AuthResponse{Token: token}, http.StatusOK)
+}
 
-	// Send response
+// Helper function to send JSON response
+func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(data)
+}
+
+// Helper function to send error response
+func sendError(w http.ResponseWriter, message string, statusCode int) {
+	sendJSON(w, ErrorResponse{Message: message}, statusCode)
 }

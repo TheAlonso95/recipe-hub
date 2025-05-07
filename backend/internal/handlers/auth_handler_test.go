@@ -3,148 +3,161 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/TheAlonso95/recipe-app/internal/models"
-	"github.com/TheAlonso95/recipe-app/internal/repository"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/yourorg/recipe-app/internal/models"
+	"github.com/yourorg/recipe-app/internal/repositories"
 )
 
-// MockUserRepository is a mock implementation of the UserRepository for testing
+// MockUserRepository is a mock implementation of the UserRepository interface
 type MockUserRepository struct {
 	users map[string]*models.User
 }
 
+// CreateUser is a mock implementation of UserRepository.CreateUser
+func (r *MockUserRepository) CreateUser(user *models.User) error {
+	// Check if user with same email already exists
+	if _, exists := r.users[user.Email]; exists {
+		return repositories.ErrEmailAlreadyTaken
+	}
+
+	// Set timestamps and mock ID
+	now := time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+	user.ID = int64(len(r.users) + 1) // Simple ID generation for tests
+
+	// Save user to mock storage
+	r.users[user.Email] = user
+	return nil
+}
+
+// GetUserByEmail is a mock implementation of UserRepository.GetUserByEmail
+func (r *MockUserRepository) GetUserByEmail(email string) (*models.User, error) {
+	user, exists := r.users[email]
+	if !exists {
+		return nil, repositories.ErrUserNotFound
+	}
+	return user, nil
+}
+
+// NewMockUserRepository creates a new mock user repository for testing
 func NewMockUserRepository() *MockUserRepository {
 	return &MockUserRepository{
 		users: make(map[string]*models.User),
 	}
 }
 
-func (m *MockUserRepository) CreateUser(user *models.User) error {
-	if _, exists := m.users[user.Email]; exists {
-		return repository.ErrDuplicateEmail
-	}
-
-	// Auto-increment ID (simple simulation)
-	user.ID = len(m.users) + 1
-	m.users[user.Email] = user
-	return nil
-}
-
-func (m *MockUserRepository) GetUserByEmail(email string) (*models.User, error) {
-	user, exists := m.users[email]
-	if !exists {
-		return nil, repository.ErrUserNotFound
-	}
-	return user, nil
-}
-
-// Mocked AuthHandler for testing
-type MockAuthHandler struct {
-	AuthHandler
-}
-
-func NewMockAuthHandler() *MockAuthHandler {
-	mockRepo := NewMockUserRepository()
-	return &MockAuthHandler{
-		AuthHandler: AuthHandler{
-			UserRepo: mockRepo,
-		},
-	}
-}
-
 func TestRegister(t *testing.T) {
-	handler := NewMockAuthHandler()
+	// Create mock repository and handler
+	mockRepo := NewMockUserRepository()
+	handler := NewAuthHandler(mockRepo)
 
-	// Test valid registration
-	reqBody := models.RegisterRequest{
+	// Create test request
+	reqBody := RegisterRequest{
 		Email:    "test@example.com",
 		Password: "password123",
 	}
 	body, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
-	w := httptest.NewRecorder()
+	// Create response recorder
+	rr := httptest.NewRecorder()
 
-	handler.Register(w, req)
+	// Call the handler
+	handler.Register(rr, req)
 
-	if w.Code != http.StatusCreated {
-		t.Errorf("Expected status code %d, got %d", http.StatusCreated, w.Code)
+	// Check response status
+	if status := rr.Code; status != http.StatusCreated {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusCreated)
 	}
 
-	var response models.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &response)
-
+	// Check response body contains token
+	var response AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &response)
 	if response.Token == "" {
-		t.Error("Expected token to be returned")
+		t.Error("Expected token in response, got empty string")
 	}
 
-	if response.User.Email != reqBody.Email {
-		t.Errorf("Expected email %s, got %s", reqBody.Email, response.User.Email)
-	}
-
-	// Test duplicate email
-	req = httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
-	w = httptest.NewRecorder()
-
-	handler.Register(w, req)
-
-	if w.Code != http.StatusConflict {
-		t.Errorf("Expected status code %d, got %d", http.StatusConflict, w.Code)
+	// Test duplicate email registration
+	rr = httptest.NewRecorder()
+	handler.Register(rr, req)
+	if status := rr.Code; status != http.StatusConflict {
+		t.Errorf("Handler should return conflict on duplicate email: got %v want %v", status, http.StatusConflict)
 	}
 }
 
 func TestLogin(t *testing.T) {
-	handler := NewMockAuthHandler()
+	// Create mock repository and handler
+	mockRepo := NewMockUserRepository()
+	handler := NewAuthHandler(mockRepo)
 
-	// First register a test user
-	email := "login-test@example.com"
-	password := "password123"
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	// Create a user for testing
 	user := &models.User{
-		Email:    email,
-		Password: string(hashedPassword),
+		Email:    "test@example.com",
+		Password: "", // Will be set by CreateUser
 	}
 
-	handler.UserRepo.CreateUser(user)
+	// Hash the password before saving
+	password := "password123"
+	hashedPassword, _ := utils.HashPassword(password)
+	user.Password = hashedPassword
+	mockRepo.CreateUser(user)
 
-	// Test valid login
-	reqBody := models.LoginRequest{
-		Email:    email,
+	// Test successful login
+	reqBody := LoginRequest{
+		Email:    "test@example.com",
 		Password: password,
 	}
 	body, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
-	w := httptest.NewRecorder()
+	handler.Login(rr, req)
 
-	handler.Login(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+	// Check response status
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	var response models.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &response)
-
+	// Check response body contains token
+	var response AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &response)
 	if response.Token == "" {
-		t.Error("Expected token to be returned")
+		t.Error("Expected token in response, got empty string")
 	}
 
 	// Test invalid password
 	reqBody.Password = "wrongpassword"
 	body, _ = json.Marshal(reqBody)
+	req, _ = http.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
 
-	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
-	w = httptest.NewRecorder()
+	handler.Login(rr, req)
 
-	handler.Login(w, req)
+	// Check response status
+	if status := rr.Code; status != http.StatusUnauthorized {
+		t.Errorf("Handler should return unauthorized on wrong password: got %v want %v", status, http.StatusUnauthorized)
+	}
 
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, w.Code)
+	// Test invalid email
+	reqBody.Email = "nonexistent@example.com"
+	body, _ = json.Marshal(reqBody)
+	req, _ = http.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+
+	handler.Login(rr, req)
+
+	// Check response status
+	if status := rr.Code; status != http.StatusUnauthorized {
+		t.Errorf("Handler should return unauthorized on wrong email: got %v want %v", status, http.StatusUnauthorized)
 	}
 }
